@@ -16,7 +16,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("All arguments are valid. Proceeding with the reconciliation process...")
+	fmt.Println("All arguments are valid. Proceeding with creating records...")
 
 	systemTransactionFile := argsRaw[0]
 	bankStatementFiles := strings.Split(argsRaw[1], ",")
@@ -43,11 +43,36 @@ func main() {
 		}
 	}
 
-	fmt.Println("All records created successfully. Starting reconciliation...")
+	fmt.Println("\nAll records created successfully. Starting reconciliation...")
 	start := time.Now()
 
-	impl.Reconcile()
+	output, err := impl.Reconcile()
+	if err != nil {
+		fmt.Println("Error upon reconciliation:", err)
+	}
 
 	duration := time.Since(start)
 	fmt.Printf("Reconciliation process completed in %s\n", duration)
+
+	fmt.Println("\n---- Reconciliation results: ----")
+	if output == nil {
+		fmt.Println("No records to display.")
+	} else {
+		fmt.Printf("Total processed records: %d\n", output.TotalProcessedRecords)
+		fmt.Printf("Total matched transactions: %d\n", output.TotalMatchedTransactions)
+		fmt.Printf("Total unmatched transactions: %d\n", output.TotalUnmatchedTransactions)
+		fmt.Printf("Total invalid records: %d\n", output.TotalInvalidRecords)
+		fmt.Printf("Total discrepancies: %.2f\n", output.TotalDiscrepancies)
+		fmt.Printf("Unmatched system transactions: %d\n", len(output.UnmatchedSystemTransactions))
+		for _, trx := range output.UnmatchedSystemTransactions {
+			fmt.Printf(" - %s: %.2f on %s\n", trx.TrxID, trx.Amount, trx.TransactionTime)
+		}
+		fmt.Printf("Unmatched bank statements: %d\n", len(output.UnmatchedBankStmts))
+		for bankName, stmts := range output.UnmatchedBankStmts {
+			fmt.Printf(" + %s\n", bankName)
+			for _, stmt := range stmts {
+				fmt.Printf("   - %s: %.2f on %s\n", stmt.UniqueIdentifier, stmt.Amount, stmt.Date)
+			}
+		}
+	}
 }

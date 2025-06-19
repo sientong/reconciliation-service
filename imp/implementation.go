@@ -3,16 +3,15 @@ package impl
 import (
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reconsiliation-service/model"
+	"reconsiliation-service/util"
 	validator "reconsiliation-service/validator"
 	"strconv"
 	"strings"
-	"time"
 )
-
-var layout = "20060102"
 
 func CreateRecords(filePath string, recordType string, startDate string, endDate string) error {
 
@@ -77,12 +76,11 @@ func parseSystemTransactionRecord(record []string, startDate string, endDate str
 		IsMatched:       false,
 	}
 
-	t, err := time.Parse(time.RFC3339, newRecord.TransactionTime)
+	transactionDate, err := util.ConvertSystemTransactionDate(newRecord.TransactionTime)
 	if err != nil {
-		return fmt.Errorf("parse transaction time %s: %w", newRecord.TransactionTime, err)
+		return fmt.Errorf("error when converting transaction date %s: %w", newRecord.TransactionTime, err)
 	}
 
-	transactionDate := t.Format(layout)
 	if transactionDate < startDate || transactionDate > endDate {
 		return fmt.Errorf("transaction time %s is out of range [%s, %s]", newRecord.TransactionTime, startDate, endDate)
 	}
@@ -138,12 +136,10 @@ func parseBankStatementRecord(record []string, bankName string, startDate string
 		IsMatched:        false,
 	}
 
-	t, err := time.Parse("2006-01-02", newRecord.Date)
+	transactionDate, err := util.ConvertBankStatementDate(newRecord.Date)
 	if err != nil {
-		return fmt.Errorf("parse date %s: %w", newRecord.Date, err)
+		return fmt.Errorf("error when converting bank statement date %s: %w", newRecord.Date, err)
 	}
-
-	transactionDate := t.Format(layout)
 
 	if transactionDate < startDate || transactionDate > endDate {
 		return fmt.Errorf("date %s is out of range [%s, %s]", newRecord.Date, startDate, endDate)
@@ -158,15 +154,28 @@ func parseBankStatementRecord(record []string, bankName string, startDate string
 	return nil
 }
 
-func Reconcile() error {
+func Reconcile() (*model.Output, error) {
 
-	fmt.Println("Starting reconciliation process...")
 	output := &model.Output{}
 
+	// Check for a match between system transactions and bank statements
 	for _, systemTransaction := range model.SystemTransactionRecords {
 		for bankName, bankRecords := range model.BankStatementRecordsMap {
 			for i, bankRecord := range bankRecords {
-				if !bankRecord.IsMatched && systemTransaction.Amount == bankRecord.Amount && systemTransaction.TransactionTime == bankRecord.Date {
+
+				bankRecordDate, err := util.ConvertBankStatementDate(bankRecord.Date)
+				if err != nil {
+					output.TotalInvalidRecords++
+					continue
+				}
+
+				systemTransactionDate, err := util.ConvertSystemTransactionDate(systemTransaction.TransactionTime)
+				if err != nil {
+					output.TotalInvalidRecords++
+					continue
+				}
+
+				if !bankRecord.IsMatched && systemTransaction.Amount == math.Abs(bankRecord.Amount) && systemTransactionDate == bankRecordDate {
 					systemTransaction.IsMatched = true
 					bankRecords[i].IsMatched = true
 					fmt.Printf("Matched: System Transaction %s with Bank Record %s from %s\n", systemTransaction.TrxID, bankRecord.UniqueIdentifier, bankName)
@@ -176,9 +185,38 @@ func Reconcile() error {
 			}
 		}
 
-		// If the system transaction is not matched, we can log it or handle it as needed
-		output.TotalUnmatchedTransactions++
+		// If no bank statement is matched with systm transaction, add to unmatched transaction
+		if !systemTransaction.IsMatched {
+			output.UnmatchedSystemTransactions = append(output.UnmatchedSystemTransactions, systemTransaction)
+			fmt.Printf("Unmatched System Transaction: %s on %s\n", systemTransaction.TrxID, systemTransaction.TransactionTime)
+
+			output.TotalDiscrepancies += math.Abs(systemTransaction.Amount)
+			output.TotalUnmatchedTransactions++
+		}
+
 		output.TotalProcessedRecords++
 	}
-	return nil
+
+	// Unprocessed bank statement is treated as unmatched
+	for bankName, bankRecords := range model.BankStatementRecordsMap {
+		for _, bankRecord := range bankRecords {
+			if !bankRecord.IsMatched {
+				if output.UnmatchedBankStmts == nil {
+					output.UnmatchedBankStmts = make(map[string][]model.BankStatementRecord)
+				}
+
+				if _, exists := output.UnmatchedBankStmts[bankName]; !exists {
+					output.UnmatchedBankStmts[bankName] = []model.BankStatementRecord{}
+				}
+
+				output.UnmatchedBankStmts[bankName] = append(output.UnmatchedBankStmts[bankName], bankRecord)
+				fmt.Printf("Unmatched Bank Statement: %s on %.2f from %s on %s\n", bankRecord.UniqueIdentifier, bankRecord.Amount, bankName, bankRecord.Date)
+
+				output.TotalDiscrepancies += math.Abs(bankRecord.Amount)
+				output.TotalUnmatchedTransactions++
+				output.TotalProcessedRecords++
+			}
+		}
+	}
+	return output, nil
 }

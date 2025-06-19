@@ -46,11 +46,15 @@ corresponding transactions reflected in bank statements. This process helps iden
 
 ## Running the program
 
-You can run the program using following command:
+### You can run the program using following command:
 
-```go run main.go financial_statement.csv bankName_YYYYMMDD.csv,bankName_YYYYMMDD.csv,... YYYYMMDD YYYYMMDD```
+```go run . financial_statement.csv bankName_YYYYMMDD.csv,bankName_YYYYMMDD.csv,... YYYYMMDD YYYYMMDD```
 
-arguments:
+e.g:
+
+```go run . csv/st_small.csv csv/bankA_20250605.csv,csv/bankB_20250605.csv 20250604 20250610```
+
+### Arguments:
 
 1. `Financial statement`: must be in csv
 
@@ -63,6 +67,9 @@ arguments:
 
 4. `End date`: format is YYYYMMDD
 
+### Output
+
+![alt text](image.png)
 
 ## Steps
 

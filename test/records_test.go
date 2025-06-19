@@ -87,15 +87,11 @@ func TestRecord_WithValidBankStatementRecord(t *testing.T) {
 
 func TestRecord_WithIncorrectDataType(t *testing.T) {
 	err := CreateRecords("../csv/st_incorrect_record.csv", "systemTransaction", "20250601", "20250630")
-	if err == nil {
-		t.Errorf("Expected error for invalid data type record, but got nil: %v", err)
+	if err != nil {
+		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
 	}
-}
 
-func TestRecord_WithMatchedTransaction(t *testing.T) {
-
-}
-
-func TestRecord_WithUnmatchedTransaction(t *testing.T) {
-
+	if len(model.SystemTransactionRecords) != 0 {
+		t.Errorf("Expected no system transaction records, got: %d", len(model.SystemTransactionRecords))
+	}
 }

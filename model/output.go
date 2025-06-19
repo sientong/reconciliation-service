@@ -5,7 +5,7 @@ type Output struct {
 	TotalMatchedTransactions    int
 	TotalUnmatchedTransactions  int
 	UnmatchedSystemTransactions []InternalTransactionRecord
-	UnmatchedBankStmts          []BankStatementRecord
+	UnmatchedBankStmts          map[string][]BankStatementRecord
 	TotalInvalidRecords         int
 	TotalDiscrepancies          float64
 }
