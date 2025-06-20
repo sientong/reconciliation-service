@@ -1,9 +1,10 @@
 package test
 
 import (
-	. "reconciliation-service/imp"
-	"reconciliation-service/model"
 	"testing"
+
+	. "github.com/sientong/reconciliation-service/imp"
+	"github.com/sientong/reconciliation-service/model"
 )
 
 func TestRecrod_WithValidTransactionRecord(t *testing.T) {

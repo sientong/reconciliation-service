@@ -1,4 +1,4 @@
-module reconciliation-service
+module github.com/sientong/reconciliation-service
 
 go 1.23.4
 

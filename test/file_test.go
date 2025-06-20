@@ -2,8 +2,9 @@ package test
 
 import (
 	"fmt"
-	. "reconciliation-service/validator"
 	"testing"
+
+	. "github.com/sientong/reconciliation-service/validator"
 )
 
 func TestFile_WithNotExistFile(t *testing.T) {

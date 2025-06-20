@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reconciliation-service/model"
-	"reconciliation-service/util"
-	validator "reconciliation-service/validator"
 	"strconv"
 	"strings"
+
+	"github.com/sientong/reconciliation-service/model"
+	"github.com/sientong/reconciliation-service/util"
+	validator "github.com/sientong/reconciliation-service/validator"
 )
 
 func InitModel() {

@@ -2,8 +2,9 @@ package test
 
 import (
 	"math"
-	. "reconciliation-service/imp"
 	"testing"
+
+	. "github.com/sientong/reconciliation-service/imp"
 )
 
 func TestOutput_WithSmallDatasetUsingSimpleReconciliation(t *testing.T) {

@@ -2,10 +2,11 @@ package impl
 
 import (
 	"math"
-	"reconciliation-service/model"
-	"reconciliation-service/util"
 	"runtime"
 	"sync"
+
+	"github.com/sientong/reconciliation-service/model"
+	"github.com/sientong/reconciliation-service/util"
 )
 
 func SimpleReconciliation() (*model.Output, error) {

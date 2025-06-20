@@ -1,8 +1,9 @@
 package test
 
 import (
-	. "reconciliation-service/validator"
 	"testing"
+
+	. "github.com/sientong/reconciliation-service/validator"
 )
 
 func TestCLI_WithValidArguments(t *testing.T) {

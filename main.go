@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
-	impl "reconciliation-service/imp"
-	"reconciliation-service/model"
-	"reconciliation-service/validator"
 	"strings"
 	"time"
+
+	impl "github.com/sientong/reconciliation-service/imp"
+	"github.com/sientong/reconciliation-service/model"
+	"github.com/sientong/reconciliation-service/validator"
 
 	"github.com/joho/godotenv"
 )
