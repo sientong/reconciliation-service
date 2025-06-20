@@ -74,10 +74,15 @@ func parseSystemTransactionRecord(record []string, startDate string, endDate str
 		return fmt.Errorf("parse amount %s: %w", record[1], err)
 	}
 
+	transactionType := strings.ToLower(record[2])
+	if transactionType != "credit" && transactionType != "debit" {
+		return fmt.Errorf("invalid transaction type %s, must be 'credit' or 'debit'", transactionType)
+	}
+
 	newRecord := &model.InternalTransactionRecord{
 		TrxID:           record[0],
 		Amount:          amount,
-		Type:            record[2],
+		Type:            transactionType,
 		TransactionTime: record[3],
 		IsMatched:       false,
 	}

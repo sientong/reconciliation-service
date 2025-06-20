@@ -33,8 +33,8 @@ func TestRecrod_WithValidTransactionRecord(t *testing.T) {
 		t.Errorf("Expected first record Amount to be 6241250.16, got: %s", model.SystemTransactionRecords[0].TrxID)
 	}
 
-	if model.SystemTransactionRecords[0].Type != "DEBIT" {
-		t.Errorf("Expected first record Type to be 'DEBIT', got: %s", model.SystemTransactionRecords[0].TrxID)
+	if model.SystemTransactionRecords[0].Type != "debit" {
+		t.Errorf("Expected first record Type to be 'debit', got: %s", model.SystemTransactionRecords[0].Type)
 	}
 
 	if model.SystemTransactionRecords[0].TransactionTime != "2025-06-05T08:01:00Z" {

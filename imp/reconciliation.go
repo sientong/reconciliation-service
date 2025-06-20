@@ -16,7 +16,11 @@ func SimpleReconciliation() (*model.Output, error) {
 	// Check for a match between system transactions and bank statements
 	for _, systemTransaction := range model.SystemTransactionRecords {
 		for _, bankRecords := range model.BankStatementRecordsMap {
-			for i, bankRecord := range bankRecords {
+			for _, bankRecord := range bankRecords {
+
+				if bankRecord.IsMatched || systemTransaction.Amount != math.Abs(bankRecord.Amount) {
+					continue
+				}
 
 				bankRecordDate, err := util.ConvertBankStatementDate(bankRecord.Date)
 				if err != nil {
@@ -30,13 +34,21 @@ func SimpleReconciliation() (*model.Output, error) {
 					continue
 				}
 
-				if !bankRecord.IsMatched && systemTransaction.Amount == math.Abs(bankRecord.Amount) && systemTransactionDate == bankRecordDate {
-					systemTransaction.IsMatched = true
-					bankRecords[i].IsMatched = true
-					// fmt.Printf("Matched: System Transaction %s with Bank Record %s from %s\n", systemTransaction.TrxID, bankRecord.UniqueIdentifier, bankName)
-					output.TotalMatchedTransactions++
-					break
+				if systemTransactionDate != bankRecordDate {
+					continue
 				}
+
+				if systemTransaction.Type == "debit" && bankRecord.Amount > 0 {
+					continue
+				}
+
+				if systemTransaction.Type == "credit" && bankRecord.Amount < 0 {
+					continue
+				}
+
+				systemTransaction.IsMatched = true
+				bankRecord.IsMatched = true
+				output.TotalMatchedTransactions++
 			}
 		}
 
@@ -68,12 +80,15 @@ func ConcurrentReconcilliation() (*model.Output, error) {
 		bankLocks[bankName] = &sync.Mutex{}
 	}
 
+	// Initialize output structure
 	output := &model.Output{}
 	var outMu sync.Mutex
 
+	// Create a channel to hold system transactions for processing
 	jobs := make(chan *model.InternalTransactionRecord, len(model.SystemTransactionRecords))
 	var wg sync.WaitGroup
 
+	// Worker function to process transactions concurrently
 	worker := func() {
 		defer wg.Done()
 		for systemTransaction := range jobs {
@@ -81,11 +96,14 @@ func ConcurrentReconcilliation() (*model.Output, error) {
 		}
 	}
 
+	// Start workers
 	wg.Add(workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go worker()
 	}
 
+	// Send system transactions to the jobs channel
+	// This will block until all transactions are sent
 	for i := range model.SystemTransactionRecords {
 		jobs <- model.SystemTransactionRecords[i]
 	}
@@ -98,6 +116,8 @@ func ConcurrentReconcilliation() (*model.Output, error) {
 	return output, nil
 }
 
+// processTransaction processes a single system transaction against bank records.
+// It checks for matches, updates the records, and increments the output counters.
 func processTransaction(transaction *model.InternalTransactionRecord,
 	bankLocks map[string]*sync.Mutex,
 	outMu *sync.Mutex,
@@ -111,12 +131,23 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 		return
 	}
 
+	// Check each bank's records for a match with the system transaction
+	// Lock the bank records to prevent concurrent writes
+	// and ensure thread safety
 	for bankName, bankRecords := range model.BankStatementRecordsMap {
 		lock := bankLocks[bankName]
 
 		lock.Lock()
 		for _, bankRecord := range bankRecords {
 			if bankRecord.IsMatched || transaction.Amount != math.Abs(bankRecord.Amount) {
+				continue
+			}
+
+			if transaction.Type == "debit" && bankRecord.Amount > 0 {
+				continue
+			}
+
+			if transaction.Type == "credit" && bankRecord.Amount < 0 {
 				continue
 			}
 
@@ -130,6 +161,9 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 
 			transaction.IsMatched = true
 			bankRecord.IsMatched = true
+
+			// Lock the output to update counters safely
+			// Increment the matched transactions count
 			outMu.Lock()
 			output.TotalMatchedTransactions++
 			outMu.Unlock()
@@ -143,9 +177,13 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 		}
 	}
 
+	// Lock the output to update counters safely
+	// Increment the total processed records count
 	outMu.Lock()
-	defer outMu.Unlock()
 	output.TotalProcessedRecords++
+	outMu.Unlock()
+
+	// If no bank statement is matched with system transaction, add to unmatched transaction
 	if !transaction.IsMatched {
 		output.UnmatchedSystemTransactions = append(output.UnmatchedSystemTransactions, *transaction)
 		// fmt.Printf("Unmatched System Transaction: %s on %s\n", transaction.TrxID, transaction.TransactionTime)
@@ -160,21 +198,23 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 func collectUnmatchedBankStmts(output *model.Output) {
 	for bankName, bankRecords := range model.BankStatementRecordsMap {
 		for _, bankRecord := range bankRecords {
-			if !bankRecord.IsMatched {
-				if output.UnmatchedBankStmts == nil {
-					output.UnmatchedBankStmts = make(map[string][]model.BankStatementRecord)
-				}
-
-				if _, exists := output.UnmatchedBankStmts[bankName]; !exists {
-					output.UnmatchedBankStmts[bankName] = []model.BankStatementRecord{}
-				}
-
-				output.UnmatchedBankStmts[bankName] = append(output.UnmatchedBankStmts[bankName], *bankRecord)
-				output.TotalDiscrepancies += math.Abs(bankRecord.Amount)
-				output.TotalUnmatchedTransactions++
-				output.TotalUnmatchedBankStmts++
-				output.TotalProcessedRecords++
+			if bankRecord.IsMatched {
+				continue
 			}
+
+			if output.UnmatchedBankStmts == nil {
+				output.UnmatchedBankStmts = make(map[string][]model.BankStatementRecord)
+			}
+
+			if _, exists := output.UnmatchedBankStmts[bankName]; !exists {
+				output.UnmatchedBankStmts[bankName] = []model.BankStatementRecord{}
+			}
+
+			output.UnmatchedBankStmts[bankName] = append(output.UnmatchedBankStmts[bankName], *bankRecord)
+			output.TotalDiscrepancies += math.Abs(bankRecord.Amount)
+			output.TotalUnmatchedTransactions++
+			output.TotalUnmatchedBankStmts++
+			output.TotalProcessedRecords++
 		}
 	}
 }
