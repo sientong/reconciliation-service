@@ -4,10 +4,22 @@ import (
 	"fmt"
 	"os"
 	impl "reconsiliation-service/imp"
+	"reconsiliation-service/model"
 	"reconsiliation-service/validator"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Initialize the model and other necessary components
+	impl.InitModel()
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env file:", err)
+	}
+}
 
 func main() {
 	var argsRaw = os.Args[1:]
@@ -46,7 +58,25 @@ func main() {
 	fmt.Println("\nAll records created successfully. Starting reconciliation...")
 	start := time.Now()
 
-	output, err := impl.ConcurrentReconcilliation()
+	reconcilliationStrategy := os.Getenv("RECONCILLIATION_STRATEGY")
+
+	var output *model.Output
+	var err error
+
+	switch reconcilliationStrategy {
+	case "simple":
+		fmt.Println("Using simple reconciliation strategy...")
+		output, err = impl.SimpleReconciliation()
+
+	case "concurrent":
+		fmt.Println("Using concurrent reconciliation strategy...")
+		output, err = impl.ConcurrentReconcilliation()
+
+	default:
+		fmt.Printf("Unknown reconciliation strategy '%s', defaulting to 'concurrent'\n", reconcilliationStrategy)
+		output, err = impl.ConcurrentReconcilliation()
+	}
+
 	if err != nil {
 		fmt.Println("Error upon reconciliation:", err)
 	}

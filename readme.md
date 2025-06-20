@@ -67,13 +67,23 @@ e.g:
 
 4. `End date`: format is YYYYMMDD
 
+### Environment variable
+
+There is a variable in `.env` which is used to determine reconcilliation strategy. Set it to `simple` will make the program using conventional looping to reconcile the data, while set to `concurrent` or simply remove its value will automatically make the program using concurrency which implements go worker.
+
 ### Output
 
-![alt text](image.png)
+- Using simple reconcilliation strategy
+![alt text](image-3.png)
+![alt text](image-4.png)
+
+- Using concurrent reconcilliation strategy
+![alt text](image-1.png)
+![alt text](image-2.png)
 
 ## Steps
 
-1. Allow system to receive arguments with following structure: <internal_transaction_file_path> <external_transaction_file_path_1> <external_transaction_file_path_2> ... <external_transaction_file_path_n> <start_date> <end_date>
+1. Allow system to receive arguments with following structure: `<internal_transaction_file_path> <external_transaction_file_path_1>, <external_transaction_file_path_2>, ... <external_transaction_file_path_n> <start_date> <end_date>`
 
 2. Check availability and validity of each file
 

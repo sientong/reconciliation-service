@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+func InitModel() {
+	// Initialize the model and other necessary components
+	model.SystemTransactionRecords = []*model.InternalTransactionRecord{}
+	model.BankStatementRecordsMap = make(map[string][]*model.BankStatementRecord)
+}
+
 func CreateRecords(filePath string, recordType string, startDate string, endDate string) error {
 
 	switch recordType {
