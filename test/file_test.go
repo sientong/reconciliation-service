@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	. "reconsiliation-service/validator"
+	. "reconciliation-service/validator"
 	"testing"
 )
 

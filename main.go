@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	impl "reconsiliation-service/imp"
-	"reconsiliation-service/model"
-	"reconsiliation-service/validator"
+	impl "reconciliation-service/imp"
+	"reconciliation-service/model"
+	"reconciliation-service/validator"
 	"strings"
 	"time"
 

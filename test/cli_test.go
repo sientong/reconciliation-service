@@ -1,7 +1,7 @@
 package test
 
 import (
-	. "reconsiliation-service/validator"
+	. "reconciliation-service/validator"
 	"testing"
 )
 

@@ -2,8 +2,8 @@ package impl
 
 import (
 	"math"
-	"reconsiliation-service/model"
-	"reconsiliation-service/util"
+	"reconciliation-service/model"
+	"reconciliation-service/util"
 	"runtime"
 	"sync"
 )

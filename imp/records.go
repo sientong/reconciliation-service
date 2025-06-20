@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reconsiliation-service/model"
-	"reconsiliation-service/util"
-	validator "reconsiliation-service/validator"
+	"reconciliation-service/model"
+	"reconciliation-service/util"
+	validator "reconciliation-service/validator"
 	"strconv"
 	"strings"
 )

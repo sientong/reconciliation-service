@@ -1,8 +1,8 @@
 package test
 
 import (
-	. "reconsiliation-service/imp"
-	"reconsiliation-service/model"
+	. "reconciliation-service/imp"
+	"reconciliation-service/model"
 	"testing"
 )
 

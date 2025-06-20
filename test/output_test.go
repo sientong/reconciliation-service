@@ -2,7 +2,7 @@ package test
 
 import (
 	"math"
-	. "reconsiliation-service/imp"
+	. "reconciliation-service/imp"
 	"testing"
 )
 
