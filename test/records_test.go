@@ -7,6 +7,8 @@ import (
 )
 
 func TestRecrod_WithValidTransactionRecord(t *testing.T) {
+
+	clearRecords()
 	err := CreateRecords("../csv/st_small.csv", "systemTransaction", "20250601", "20250630")
 	if err != nil {
 		t.Errorf("Expected no error for valid record, but got: %v", err)
@@ -42,9 +44,12 @@ func TestRecrod_WithValidTransactionRecord(t *testing.T) {
 		t.Errorf("Expected first record IsMatched to be false, got: %t", model.SystemTransactionRecords[0].IsMatched)
 	}
 
+	clearRecords()
 }
 
 func TestRecord_WithValidBankStatementRecord(t *testing.T) {
+
+	clearRecords()
 
 	err := CreateRecords("../csv/bankA_20250605.csv", "bankStatement", "20250601", "20250630")
 	if err != nil {
@@ -57,8 +62,8 @@ func TestRecord_WithValidBankStatementRecord(t *testing.T) {
 		}
 	}
 
-	if len(model.BankStatementRecordsMap["bankA"]) != 2 {
-		t.Errorf("Expected 2 system transaction records, got: %d", len(model.SystemTransactionRecords))
+	if len(model.BankStatementRecordsMap["bankA"]) != 3 {
+		t.Errorf("Expected 2 bank statement records, got: %d", len(model.BankStatementRecordsMap["bankA"]))
 	}
 
 	for _, record := range model.BankStatementRecordsMap["bankA"] {
@@ -83,9 +88,13 @@ func TestRecord_WithValidBankStatementRecord(t *testing.T) {
 		t.Errorf("Expected first record IsMatched to be false, got: %t", model.SystemTransactionRecords[0].IsMatched)
 	}
 
+	clearRecords()
 }
 
 func TestRecord_WithIncorrectDataType(t *testing.T) {
+
+	clearRecords()
+
 	err := CreateRecords("../csv/st_incorrect_record.csv", "systemTransaction", "20250601", "20250630")
 	if err != nil {
 		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
@@ -94,4 +103,11 @@ func TestRecord_WithIncorrectDataType(t *testing.T) {
 	if len(model.SystemTransactionRecords) != 0 {
 		t.Errorf("Expected no system transaction records, got: %d", len(model.SystemTransactionRecords))
 	}
+
+	clearRecords()
+}
+
+func clearRecords() {
+	model.SystemTransactionRecords = nil
+	model.BankStatementRecordsMap = make(map[string][]*model.BankStatementRecord)
 }

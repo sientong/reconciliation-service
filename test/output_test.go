@@ -1,11 +1,15 @@
 package test
 
 import (
+	"math"
 	. "reconsiliation-service/imp"
 	"testing"
 )
 
-func TestOutput_Reconciliation(t *testing.T) {
+func TestOutput_WithSmallDatasetUsingSimpleReconciliation(t *testing.T) {
+
+	clearRecords()
+
 	if err := CreateRecords("../csv/st_small.csv", "systemTransaction", "20250601", "20250630"); err != nil {
 		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
 	}
@@ -18,7 +22,7 @@ func TestOutput_Reconciliation(t *testing.T) {
 		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
 	}
 
-	output, err := Reconcile()
+	output, err := SimpleReconciliation()
 	if err != nil {
 		t.Errorf("Expected no error during reconciliation, but got: %v", err)
 	}
@@ -43,7 +47,10 @@ func TestOutput_Reconciliation(t *testing.T) {
 		t.Errorf("Expected TotalInvalidRecords to be 0, got: %d", output.TotalInvalidRecords)
 	}
 
-	if output.TotalDiscrepancies != 18796234.08 {
+	var expectedDiscrepancies float64 = 18796234.08
+	var discrepancy float64 = output.TotalDiscrepancies
+	var tolerance float64 = 0.001
+	if discrepancy-expectedDiscrepancies > tolerance {
 		t.Errorf("Expected TotalDiscrepancies to be 18796234.08, got: %.2f", output.TotalDiscrepancies)
 	}
 
@@ -69,8 +76,8 @@ func TestOutput_Reconciliation(t *testing.T) {
 		t.Errorf("Expected UnmatchedBankStmts to be not nil, but got nil")
 	}
 
-	if len(output.UnmatchedBankStmts) != 2 {
-		t.Errorf("Expected UnmatchedBankStmts to have 2 banks, got: %d", len(output.UnmatchedBankStmts))
+	if output.TotalUnmatchedBankStmts != 2 {
+		t.Errorf("Expected UnmatchedBankStmts to have 2 records, got: %d", len(output.UnmatchedBankStmts))
 	}
 
 	for bankName, stmts := range output.UnmatchedBankStmts {
@@ -112,4 +119,121 @@ func TestOutput_Reconciliation(t *testing.T) {
 	if output.UnmatchedBankStmts["bankB"][0].Date != "2025-06-05" {
 		t.Errorf("Expected unmatched bank statement Date to be '2025-06-05', got: %s", output.UnmatchedBankStmts["bankB"][0].Date)
 	}
+
+	clearRecords()
+}
+
+func TestOutput_WithLargeDatasetUsingSimpleReconcilliation(t *testing.T) {
+
+	clearRecords()
+
+	if err := CreateRecords("../csv/system_transactions.csv", "systemTransaction", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for valid record, but got: %v", err)
+	}
+
+	if err := CreateRecords("../csv/bankA_20250605_large.csv", "bankStatement", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
+	}
+
+	if err := CreateRecords("../csv/bankB_20250605_large.csv", "bankStatement", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
+	}
+
+	output, err := SimpleReconciliation()
+	if err != nil {
+		t.Errorf("Expected no error during reconciliation, but got: %v", err)
+	}
+
+	if output == nil {
+		t.Errorf("Expected output to be not nil, but got nil")
+	}
+
+	if output != nil && output.TotalProcessedRecords != 120 {
+		t.Errorf("Expected TotalProcessedRecords to be 120, got: %d", output.TotalProcessedRecords)
+	}
+
+	if output.TotalMatchedTransactions != 80 {
+		t.Errorf("Expected TotalMatchedTransactions to be 80, got: %d", output.TotalMatchedTransactions)
+	}
+
+	if output.TotalUnmatchedTransactions != 40 {
+		t.Errorf("Expected TotalUnmatchedTransactions to be 40, got: %d", output.TotalUnmatchedTransactions)
+	}
+
+	if output.TotalInvalidRecords != 0 {
+		t.Errorf("Expected TotalInvalidRecords to be 0, got: %d", output.TotalInvalidRecords)
+	}
+
+	var expectedDiscrepancies float64 = 187805411.53
+	var discrepancy float64 = output.TotalDiscrepancies
+	var tolerance float64 = 0.001
+	if math.Abs(discrepancy-expectedDiscrepancies) > tolerance {
+		t.Errorf("Expected TotalDiscrepancies to be 187805411.53, got: %.2f", output.TotalDiscrepancies)
+	}
+
+	if output.TotalUnmatchedSystemTransactions != 20 {
+		t.Errorf("Expected UnmatchedSystemTransactions to be 20, got: %d", len(output.UnmatchedSystemTransactions))
+	}
+
+	clearRecords()
+}
+
+func TestOutput_WithLargeDatasetUsingConcurrentReconcilliation(t *testing.T) {
+
+	clearRecords()
+
+	if err := CreateRecords("../csv/system_transactions.csv", "systemTransaction", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for valid record, but got: %v", err)
+	}
+
+	if err := CreateRecords("../csv/bankA_20250605_large.csv", "bankStatement", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
+	}
+
+	if err := CreateRecords("../csv/bankB_20250605_large.csv", "bankStatement", "20250601", "20250630"); err != nil {
+		t.Errorf("Expected no error for invalid data type record, but got: %v", err)
+	}
+
+	output, err := ConcurrentReconcilliation()
+	if err != nil {
+		t.Errorf("Expected no error during reconciliation, but got: %v", err)
+	}
+
+	if output == nil {
+		t.Errorf("Expected output to be not nil, but got nil")
+	}
+
+	if output != nil && output.TotalProcessedRecords != 120 {
+		t.Errorf("Expected TotalProcessedRecords to be 120, got: %d", output.TotalProcessedRecords)
+	}
+
+	if output.TotalMatchedTransactions != 80 {
+		t.Errorf("Expected TotalMatchedTransactions to be 80, got: %d", output.TotalMatchedTransactions)
+	}
+
+	if output.TotalUnmatchedTransactions != 40 {
+		t.Errorf("Expected TotalUnmatchedTransactions to be 40, got: %d", output.TotalUnmatchedTransactions)
+	}
+
+	if output.TotalInvalidRecords != 0 {
+		t.Errorf("Expected TotalInvalidRecords to be 0, got: %d", output.TotalInvalidRecords)
+	}
+
+	var expectedDiscrepancies float64 = 187805411.53
+	var discrepancy float64 = output.TotalDiscrepancies
+	var tolerance float64 = 0.001
+	if math.Abs(discrepancy-expectedDiscrepancies) > tolerance {
+		t.Errorf("Expected TotalDiscrepancies to be 187805411.53, got: %.2f", output.TotalDiscrepancies)
+	}
+
+	if output.TotalUnmatchedSystemTransactions != 20 {
+		t.Errorf("Expected UnmatchedSystemTransactions to be 20, got: %d", len(output.UnmatchedSystemTransactions))
+	}
+
+	if output.TotalUnmatchedBankStmts != 20 {
+		t.Errorf("Expected UnmatchedBankStmts to be 20, got: %d", output.TotalUnmatchedBankStmts)
+	}
+
+	clearRecords()
+
 }

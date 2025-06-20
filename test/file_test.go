@@ -53,7 +53,7 @@ func TestFile_WithValidSystemTransactionFile(t *testing.T) {
 }
 
 func TestFile_WithValidBankStatementFile(t *testing.T) {
-	filepath := "../csv/bankA_20250612.csv"
+	filepath := "../csv/bankA_20250605.csv"
 	err := ValidateFile(filepath, "bankStatement")
 	if err != nil {
 		t.Errorf("Expected no error for valid bank statement file, but got: %v", err)

@@ -46,13 +46,10 @@ func main() {
 	fmt.Println("\nAll records created successfully. Starting reconciliation...")
 	start := time.Now()
 
-	output, err := impl.Reconcile()
+	output, err := impl.ConcurrentReconcilliation()
 	if err != nil {
 		fmt.Println("Error upon reconciliation:", err)
 	}
-
-	duration := time.Since(start)
-	fmt.Printf("Reconciliation process completed in %s\n", duration)
 
 	fmt.Println("\n---- Reconciliation results: ----")
 	if output == nil {
@@ -62,12 +59,12 @@ func main() {
 		fmt.Printf("Total matched transactions: %d\n", output.TotalMatchedTransactions)
 		fmt.Printf("Total unmatched transactions: %d\n", output.TotalUnmatchedTransactions)
 		fmt.Printf("Total invalid records: %d\n", output.TotalInvalidRecords)
-		fmt.Printf("Total discrepancies: %.2f\n", output.TotalDiscrepancies)
-		fmt.Printf("Unmatched system transactions: %d\n", len(output.UnmatchedSystemTransactions))
+		fmt.Printf("Total discrepancies: %.2f\n\n", output.TotalDiscrepancies)
+		fmt.Printf("Unmatched system transactions: %d\n", output.TotalUnmatchedSystemTransactions)
 		for _, trx := range output.UnmatchedSystemTransactions {
 			fmt.Printf(" - %s: %.2f on %s\n", trx.TrxID, trx.Amount, trx.TransactionTime)
 		}
-		fmt.Printf("Unmatched bank statements: %d\n", len(output.UnmatchedBankStmts))
+		fmt.Printf("Unmatched bank statements: %d\n", output.TotalUnmatchedBankStmts)
 		for bankName, stmts := range output.UnmatchedBankStmts {
 			fmt.Printf(" + %s\n", bankName)
 			for _, stmt := range stmts {
@@ -75,4 +72,7 @@ func main() {
 			}
 		}
 	}
+
+	duration := time.Since(start)
+	fmt.Printf("\nReconciliation completed in %s\n", duration)
 }

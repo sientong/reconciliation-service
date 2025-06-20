@@ -7,4 +7,4 @@ type BankStatementRecord struct {
 	IsMatched        bool
 }
 
-var BankStatementRecordsMap = make(map[string][]BankStatementRecord)
+var BankStatementRecordsMap = make(map[string][]*BankStatementRecord)

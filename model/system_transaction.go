@@ -8,4 +8,4 @@ type InternalTransactionRecord struct {
 	IsMatched       bool
 }
 
-var SystemTransactionRecords []InternalTransactionRecord
+var SystemTransactionRecords []*InternalTransactionRecord
