@@ -1,3 +1,5 @@
+# Reconciliation Service
+
 ## Problem Statement
 
 Amartha manages multiple bank accounts and requires a service to reconcile transactions occurring within their system against
@@ -44,15 +46,44 @@ corresponding transactions reflected in bank statements. This process helps iden
 
 3. Allow processing large dataset (>10000 records)
 
+4. Dockerize to allow environment consistency
+
+
 ## Running the program
 
-### You can run the program using following command:
+### CLI Command:
 
 ```go run . financial_statement.csv bankName_YYYYMMDD.csv,bankName_YYYYMMDD.csv,... YYYYMMDD YYYYMMDD```
 
 e.g:
 
 ```go run . csv/st_small.csv csv/bankA_20250605.csv,csv/bankB_20250605.csv 20250604 20250610```
+
+### Docker Command:
+
+```docker build -t reconciliation-service .```
+
+```
+docker run --rm \                       
+  -v $(pwd)/csv:/app/csv \
+  reconciliation-service \
+  csv/system_transactions.csv \
+  csv/bankA_20250605_large.csv,csv/bankB_20250605_large.csv \
+  20250604 \
+  20250610
+```
+
+### Using Makefile:
+
+- `make build` : to build docker image
+
+- `make run` : to run docker image using predefined args
+
+- `make run-custom` : to run docker image using custom args
+
+```
+make run-custom ARGS="csv/system_transactions.csv csv/bankA.csv,csv/bankB.csv 20250604 20250610"
+```
 
 ### Arguments:
 
