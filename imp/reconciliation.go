@@ -185,9 +185,10 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 
 	// If no bank statement is matched with system transaction, add to unmatched transaction
 	if !transaction.IsMatched {
-		output.UnmatchedSystemTransactions = append(output.UnmatchedSystemTransactions, *transaction)
-		// fmt.Printf("Unmatched System Transaction: %s on %s\n", transaction.TrxID, transaction.TransactionTime)
+		outMu.Lock()
+		defer outMu.Unlock()
 
+		output.UnmatchedSystemTransactions = append(output.UnmatchedSystemTransactions, *transaction)
 		output.TotalDiscrepancies += math.Abs(transaction.Amount)
 		output.TotalUnmatchedSystemTransactions++
 		output.TotalUnmatchedTransactions++
