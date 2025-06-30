@@ -71,69 +71,74 @@ func SimpleReconciliation() (*model.Output, error) {
 }
 
 func ConcurrentReconcilliation() (*model.Output, error) {
-
 	workers := 2 * runtime.NumCPU()
 
-	// mutex to ensure no race condition for IsMatched field
+	// Bank locks to protect each bank’s records
 	bankLocks := make(map[string]*sync.Mutex, len(model.BankStatementRecordsMap))
 	for bankName := range model.BankStatementRecordsMap {
 		bankLocks[bankName] = &sync.Mutex{}
 	}
 
-	// Initialize output structure
-	output := &model.Output{}
-	var outMu sync.Mutex
+	jobs := make(chan *model.InternalTransactionRecord)
+	results := make(chan *model.Output) // Per-worker results
 
-	// Create a channel to hold system transactions for processing
-	jobs := make(chan *model.InternalTransactionRecord, len(model.SystemTransactionRecords))
 	var wg sync.WaitGroup
-
-	// Worker function to process transactions concurrently
-	worker := func() {
-		defer wg.Done()
-		for systemTransaction := range jobs {
-			processTransaction(systemTransaction, bankLocks, &outMu, output)
-		}
-	}
 
 	// Start workers
 	wg.Add(workers)
 	for range workers {
-		go worker()
+		go func() {
+			defer wg.Done()
+			localOutput := &model.Output{}
+
+			for trx := range jobs {
+				processTransactionLocal(trx, bankLocks, localOutput)
+			}
+
+			results <- localOutput // Send local results
+		}()
 	}
 
-	// Send system transactions to the jobs channel
-	// This will block until all transactions are sent
-	for i := range model.SystemTransactionRecords {
-		jobs <- model.SystemTransactionRecords[i]
+	// Feed jobs
+	go func() {
+		for _, trx := range model.SystemTransactionRecords {
+			jobs <- trx
+		}
+		close(jobs)
+	}()
+
+	// Wait for workers to finish and close results channel
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Merge all local outputs into final output
+	finalOutput := &model.Output{}
+
+	for localOut := range results {
+		mergeOutput(finalOutput, localOut)
 	}
 
-	close(jobs)
-	wg.Wait()
+	// Collect unmatched bank statements (still single-threaded)
+	collectUnmatchedBankStmts(finalOutput)
 
-	collectUnmatchedBankStmts(output)
-
-	return output, nil
+	return finalOutput, nil
 }
 
 // processTransaction processes a single system transaction against bank records.
 // It checks for matches, updates the records, and increments the output counters.
-func processTransaction(transaction *model.InternalTransactionRecord,
+func processTransactionLocal(
+	transaction *model.InternalTransactionRecord,
 	bankLocks map[string]*sync.Mutex,
-	outMu *sync.Mutex,
-	output *model.Output) {
+	localOutput *model.Output) {
 
 	transactionDate, err := util.ConvertSystemTransactionDate(transaction.TransactionTime)
 	if err != nil {
-		outMu.Lock()
-		output.TotalInvalidRecords++
-		outMu.Unlock()
+		localOutput.TotalInvalidRecords++
 		return
 	}
 
-	// Check each bank's records for a match with the system transaction
-	// Lock the bank records to prevent concurrent writes
-	// and ensure thread safety
 	for bankName, bankRecords := range model.BankStatementRecordsMap {
 		lock := bankLocks[bankName]
 
@@ -153,21 +158,14 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 
 			bankRecordDate, err := util.ConvertBankStatementDate(bankRecord.Date)
 			if err != nil || transactionDate != bankRecordDate {
-				outMu.Lock()
-				output.TotalInvalidRecords++
-				outMu.Unlock()
+				localOutput.TotalInvalidRecords++
 				continue
 			}
 
 			transaction.IsMatched = true
 			bankRecord.IsMatched = true
 
-			// Lock the output to update counters safely
-			// Increment the matched transactions count
-			outMu.Lock()
-			output.TotalMatchedTransactions++
-			outMu.Unlock()
-			// fmt.Printf("Matched: System Transaction %s with Bank Record %s from %s status %t\n", transaction.TrxID, bankRecord.UniqueIdentifier, bankName, bankRecord.IsMatched)
+			localOutput.TotalMatchedTransactions++
 			break
 		}
 		lock.Unlock()
@@ -177,22 +175,26 @@ func processTransaction(transaction *model.InternalTransactionRecord,
 		}
 	}
 
-	// Lock the output to update counters safely
-	// Increment the total processed records count
-	outMu.Lock()
-	output.TotalProcessedRecords++
-	outMu.Unlock()
+	localOutput.TotalProcessedRecords++
 
-	// If no bank statement is matched with system transaction, add to unmatched transaction
 	if !transaction.IsMatched {
-		outMu.Lock()
-		defer outMu.Unlock()
-
-		output.UnmatchedSystemTransactions = append(output.UnmatchedSystemTransactions, *transaction)
-		output.TotalDiscrepancies += math.Abs(transaction.Amount)
-		output.TotalUnmatchedSystemTransactions++
-		output.TotalUnmatchedTransactions++
+		localOutput.UnmatchedSystemTransactions = append(localOutput.UnmatchedSystemTransactions, *transaction)
+		localOutput.TotalDiscrepancies += math.Abs(transaction.Amount)
+		localOutput.TotalUnmatchedSystemTransactions++
+		localOutput.TotalUnmatchedTransactions++
 	}
+}
+
+func mergeOutput(final *model.Output, local *model.Output) {
+	final.TotalMatchedTransactions += local.TotalMatchedTransactions
+	final.TotalProcessedRecords += local.TotalProcessedRecords
+	final.TotalInvalidRecords += local.TotalInvalidRecords
+	final.TotalUnmatchedTransactions += local.TotalUnmatchedTransactions
+	final.TotalUnmatchedSystemTransactions += local.TotalUnmatchedSystemTransactions
+	final.TotalDiscrepancies += local.TotalDiscrepancies
+
+	// Combine unmatched slices
+	final.UnmatchedSystemTransactions = append(final.UnmatchedSystemTransactions, local.UnmatchedSystemTransactions...)
 }
 
 // Unprocessed bank statement is treated as unmatched
@@ -217,5 +219,121 @@ func collectUnmatchedBankStmts(output *model.Output) {
 			output.TotalUnmatchedBankStmts++
 			output.TotalProcessedRecords++
 		}
+	}
+}
+
+func ConcurrentReconciliationIndexed() (*model.Output, error) {
+	workers := 2 * runtime.NumCPU()
+	index := BuildBankIndex()
+
+	jobs := make(chan *model.InternalTransactionRecord)
+	results := make(chan *model.Output)
+
+	var wg sync.WaitGroup
+
+	worker := func() {
+		defer wg.Done()
+		localOut := &model.Output{}
+
+		for trx := range jobs {
+			processTransactionIndexed(trx, &index, localOut)
+		}
+
+		results <- localOut
+	}
+
+	wg.Add(workers)
+	for range workers {
+		go worker()
+	}
+
+	// Feed jobs
+	go func() {
+		for _, trx := range model.SystemTransactionRecords {
+			jobs <- trx
+		}
+		close(jobs)
+	}()
+
+	// Wait for workers, close results channel
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	finalOutput := &model.Output{}
+	for res := range results {
+		mergeOutput(finalOutput, res)
+	}
+
+	collectUnmatchedBankStmts(finalOutput)
+	return finalOutput, nil
+}
+
+func processTransactionIndexed(
+	transaction *model.InternalTransactionRecord,
+	idx *MatchIndex,
+	localOutput *model.Output) {
+
+	transactionDate, err := util.ConvertSystemTransactionDate(transaction.TransactionTime)
+	if err != nil {
+		localOutput.TotalInvalidRecords++
+		return
+	}
+
+	amount := math.Abs(transaction.Amount)
+	txType := transaction.Type
+
+	// Lookup possible matches
+	dateBucket, ok := idx.Index[transactionDate]
+	if !ok {
+		localOutput.TotalUnmatchedSystemTransactions++
+		localOutput.TotalProcessedRecords++
+		localOutput.UnmatchedSystemTransactions = append(localOutput.UnmatchedSystemTransactions, *transaction)
+		localOutput.TotalDiscrepancies += amount
+		localOutput.TotalUnmatchedTransactions++
+		return
+	}
+
+	amtBucket, ok := dateBucket[amount]
+	if !ok {
+		localOutput.TotalUnmatchedSystemTransactions++
+		localOutput.TotalProcessedRecords++
+		localOutput.UnmatchedSystemTransactions = append(localOutput.UnmatchedSystemTransactions, *transaction)
+		localOutput.TotalDiscrepancies += amount
+		localOutput.TotalUnmatchedTransactions++
+		return
+	}
+
+	typeBucket, ok := amtBucket[txType]
+	if !ok {
+		localOutput.TotalUnmatchedSystemTransactions++
+		localOutput.TotalProcessedRecords++
+		localOutput.UnmatchedSystemTransactions = append(localOutput.UnmatchedSystemTransactions, *transaction)
+		localOutput.TotalDiscrepancies += amount
+		localOutput.TotalUnmatchedTransactions++
+		return
+	}
+
+	// Lock the bucket for safe matching
+	bucketLock := idx.Locks[transactionDate][amount][txType]
+	bucketLock.Lock()
+	defer bucketLock.Unlock()
+
+	for _, rec := range typeBucket {
+		if !rec.IsMatched {
+			rec.IsMatched = true
+			transaction.IsMatched = true
+			localOutput.TotalMatchedTransactions++
+			break
+		}
+	}
+
+	localOutput.TotalProcessedRecords++
+	if !transaction.IsMatched {
+		localOutput.TotalUnmatchedSystemTransactions++
+		localOutput.TotalUnmatchedTransactions++
+		localOutput.TotalDiscrepancies += amount
+		localOutput.UnmatchedSystemTransactions = append(localOutput.UnmatchedSystemTransactions, *transaction)
 	}
 }

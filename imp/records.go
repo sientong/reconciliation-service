@@ -3,10 +3,12 @@ package impl
 import (
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/sientong/reconciliation-service/model"
 	"github.com/sientong/reconciliation-service/util"
@@ -163,4 +165,44 @@ func parseBankStatementRecord(record []string, bankName string, startDate string
 	model.BankStatementRecordsMap[bankName] = append(model.BankStatementRecordsMap[bankName], newRecord)
 
 	return nil
+}
+
+type MatchIndex struct {
+	Index map[string]map[float64]map[string][]*model.BankStatementRecord
+	Locks map[string]map[float64]map[string]*sync.Mutex
+}
+
+func BuildBankIndex() MatchIndex {
+	idx := MatchIndex{
+		Index: make(map[string]map[float64]map[string][]*model.BankStatementRecord),
+		Locks: make(map[string]map[float64]map[string]*sync.Mutex),
+	}
+
+	for _, bankRecords := range model.BankStatementRecordsMap {
+		for _, rec := range bankRecords {
+			date, _ := util.ConvertBankStatementDate(rec.Date)
+			amount := math.Abs(rec.Amount)
+			txType := "credit"
+			if rec.Amount < 0 {
+				txType = "debit"
+			}
+
+			if _, ok := idx.Index[date]; !ok {
+				idx.Index[date] = make(map[float64]map[string][]*model.BankStatementRecord)
+				idx.Locks[date] = make(map[float64]map[string]*sync.Mutex)
+			}
+			if _, ok := idx.Index[date][amount]; !ok {
+				idx.Index[date][amount] = make(map[string][]*model.BankStatementRecord)
+				idx.Locks[date][amount] = make(map[string]*sync.Mutex)
+			}
+			if _, ok := idx.Index[date][amount][txType]; !ok {
+				idx.Index[date][amount][txType] = []*model.BankStatementRecord{}
+				idx.Locks[date][amount][txType] = &sync.Mutex{}
+			}
+
+			idx.Index[date][amount][txType] = append(idx.Index[date][amount][txType], rec)
+		}
+	}
+
+	return idx
 }

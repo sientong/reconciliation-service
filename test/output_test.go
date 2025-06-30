@@ -238,3 +238,96 @@ func TestOutput_WithLargeDatasetUsingConcurrentReconcilliation(t *testing.T) {
 	clearRecords()
 
 }
+
+func BenchmarkOutput_WithLargeDatasetUsingSimpleReconciliation(b *testing.B) {
+	clearRecords()
+
+	err := CreateRecords("../csv/system_transactions_2.csv", "systemTransaction", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create system records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankA_20250605_large_2.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankA records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankB_20250605_large.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankB records failed: %v", err)
+	}
+
+	for i := 0; i < b.N; i++ {
+
+		b.StartTimer() // Only time reconciliation
+
+		_, err = SimpleReconciliation()
+		if err != nil {
+			b.Errorf("SimpleReconciliation failed: %v", err)
+		}
+
+		b.StopTimer() // Exclude clearRecords time
+	}
+}
+
+func BenchmarkOutput_WithLargeDatasetUsingConcurrentReconciliation(b *testing.B) {
+	clearRecords()
+
+	err := CreateRecords("../csv/system_transactions_large.csv", "systemTransaction", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create system records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankA_20250605_large_2.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankA records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankB_20250605_large_2.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankB records failed: %v", err)
+	}
+
+	for i := 0; i < b.N; i++ {
+
+		b.StartTimer() // Only time reconciliation
+
+		_, err = ConcurrentReconcilliation()
+		if err != nil {
+			b.Errorf("ConcurrentReconciliation failed: %v", err)
+		}
+
+		b.StopTimer() // Exclude clearRecords time
+	}
+}
+
+func BenchmarkOutput_WithLargeDatasetUsingConcurrentReconciliationIndexed(b *testing.B) {
+	clearRecords()
+
+	err := CreateRecords("../csv/system_transactions_large.csv", "systemTransaction", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create system records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankA_20250605_large_2.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankA records failed: %v", err)
+	}
+
+	err = CreateRecords("../csv/bankB_20250605_large_2.csv", "bankStatement", "20250601", "20250630")
+	if err != nil {
+		b.Fatalf("create bankB records failed: %v", err)
+	}
+
+	for i := 0; i < b.N; i++ {
+
+		b.StartTimer() // Only time reconciliation
+
+		_, err = ConcurrentReconciliationIndexed()
+		if err != nil {
+			b.Errorf("ConcurrentReconciliation failed: %v", err)
+		}
+
+		b.StopTimer() // Exclude clearRecords time
+	}
+}
